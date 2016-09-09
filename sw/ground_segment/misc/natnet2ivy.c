@@ -646,7 +646,8 @@ gboolean timeout_send_ivy_callback(gpointer data) {
   // Loop trough all the available rigidbodies
   int i;
   for (i = 0; i < MAX_RIGIDBODIES; i++) {
-    if (aircrafts[rigidBodies[i].id].connected == FALSE) {
+    // Check if we still track the rigid
+    if (rigidBodies[i].nSamples < 1) {
       continue;
     }
     struct EnuCoor_d pos = rigidBodies[i].pos;
