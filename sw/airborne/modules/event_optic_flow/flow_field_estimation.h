@@ -34,7 +34,6 @@ struct flowField {
   float wxDerotated;
   float wyDerotated;
   float D;
-  float p[3];
   int32_t t;
 };
 
@@ -45,26 +44,25 @@ struct flowField {
  * N previous vector coordinates or the mean of cross-products of two
  * vector coordinates.
  *
- * E.g. 's<x><x>' refers to \f$\sum_i^N {<x_i>*<x_i>} / N \f$.
+ * E.g. 'm<x><x>' refers to \f$\sum_i^N {<x_i>*<x_i>} / N \f$.
  *
  * These mean values can be used to compute, among others, variance:
  * \f[
- * Var{x} = (\sum_i^N {x_i^2} - \left(\sum_i^N {x_i}\right)^2) / N
+ * {\rm Var}{x} = (\sum_i^N {x_i^2} - \left(\sum_i^N {x_i}\right)^2) / N
  *      = mxx - mx^2
  * \f]
  * And similarly, covariance:
  * \f[
- * Cov{x,y} = mxy - mx * my
+ * {\rm Cov}{x,y} = mxy - mx * my
  * \f]
  *
  * And ultimately they are used for computing the flow field as a
  * least-squares solution.
  */
 struct flowStats {
-  float mx, my, mu, mv;
-  float mxx, myy, mxu, myv;
-  float mwx, mwy;
-  float sx, sy, sxy, sxx, syy;
+  float mx, mu, mxx, mxu, muu;
+  float my, mv, myy, myv, mvv;
+  float mxy;
   float eventRate;
 };
 
@@ -90,24 +88,29 @@ enum updateStatus {
   UPDATE_STATS,             // Stats were updated - the flow field still needs to be recomputed
   UPDATE_WARNING_SINGULAR,  // No update, flow field system is singular
   UPDATE_WARNING_RATE,      // No update, event rate is too low
-  UPDATE_WARNING_SPREAD     // No update, there is too little spread in flow vector position
+  UPDATE_WARNING_SPREAD,    // No update, there is too little spread in flow vector position
+  UPDATE_WARNING_RESIDUAL   // No update, the flow field residuals are too large
 };
 
 /**
  * Performs an update of all flow field statistics with a new event.
  */
 void updateFlowStats(struct flowStats* s, struct flowEvent e, struct flowField lastField,
-    float filterTimeConstant, float movingAverageWindow, float maxSpeedDifference);
+    float filterTimeConstant, float movingAverageWindow, float maxSpeedDifference,
+  struct cameraIntrinsicParameters intrinsics);
 
 /**
  * Recomputation of the flow field using the latest statistics.
  */
 enum updateStatus recomputeFlowField(struct flowField* field, struct flowStats* s,
-    float minEventRate, float minPosVariance,
+    float minEventRate, float minPosVariance, float maxFlowResidual,
     struct cameraIntrinsicParameters intrinsics);
 
 /**
- * Derotation of the flow field parameters using rotational rate measurements.
+ * Simple derotation of the optic flow field parameters.
+ *
+ * @param field The flow field to be derotated.
+ * @param rates The input body rates.
  */
 void derotateFlowField(struct flowField* field, struct FloatRates* rates);
 

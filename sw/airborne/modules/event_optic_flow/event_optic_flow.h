@@ -51,9 +51,12 @@ extern struct module_state eofState;
 extern uint8_t enableDerotation;
 extern float statsFilterTimeConstant;
 extern float flowMaxSpeedDiff;
+extern float derotationMovingAverageFactor;
 extern float minPosVariance;
 extern float minEventRate;
+extern float maxFlowResidual;
 extern bool irLedSwitch;
+
 
 // Module main functions
 extern void event_optic_flow_init(void);

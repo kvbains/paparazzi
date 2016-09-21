@@ -49,19 +49,29 @@ PRINT_CONFIG_VAR(EOF_ENABLE_DEROTATION)
 PRINT_CONFIG_VAR(EOF_FILTER_TIME_CONSTANT)
 
 #ifndef EOF_FLOW_MAX_SPEED_DIFF
-#define EOF_FLOW_MAX_SPEED_DIFF 20.0f
+#define EOF_FLOW_MAX_SPEED_DIFF 100.0f
 #endif
 PRINT_CONFIG_VAR(EOF_FLOW_MAX_SPEED_DIFF)
 
+#ifndef EOF_DEROTATION_MOVING_AVERAGE_FACTOR
+#define EOF_DEROTATION_MOVING_AVERAGE_FACTOR 0.02f
+#endif
+PRINT_CONFIG_VAR(EOF_DEROTATION_MOVING_AVERAGE_FACTOR)
+
 #ifndef EOF_MIN_EVENT_RATE
-#define EOF_MIN_EVENT_RATE 100.0f
+#define EOF_MIN_EVENT_RATE 300.0f
 #endif
 PRINT_CONFIG_VAR(EOF_MIN_EVENT_RATE)
 
 #ifndef EOF_MIN_POSITION_VARIANCE
-#define EOF_MIN_POSITION_VARIANCE 100.0f
+#define EOF_MIN_POSITION_VARIANCE 300.0f
 #endif
 PRINT_CONFIG_VAR(EOF_MIN_POSITION_VARIANCE)
+
+#ifndef EOF_MAX_FLOW_RESIDUAL
+#define EOF_MAX_FLOW_RESIDUAL 0.6f
+#endif
+PRINT_CONFIG_VAR(EOF_MAX_FLOW_RESIDUAL)
 
 #ifndef EOF_DIVERGENCE_CONTROL_PGAIN
 #define EOF_DIVERGENCE_CONTROL_PGAIN 1.0f
@@ -92,10 +102,12 @@ float statsFilterTimeConstant = EOF_FILTER_TIME_CONSTANT;
 float flowMaxSpeedDiff = EOF_FLOW_MAX_SPEED_DIFF;
 float divergenceControlGainP = EOF_DIVERGENCE_CONTROL_PGAIN;
 float divergenceControlSetpoint = EOF_DIVERGENCE_CONTROL_DIV_SETPOINT;
+float derotationMovingAverageFactor = EOF_DEROTATION_MOVING_AVERAGE_FACTOR;
 
 // Confidence thresholds
 float minPosVariance = EOF_MIN_POSITION_VARIANCE;
 float minEventRate = EOF_MIN_EVENT_RATE;
+float maxFlowResidual = EOF_MAX_FLOW_RESIDUAL;
 
 // logging controls
 bool irLedSwitch = IR_LEDS_SWITCH;
@@ -107,8 +119,7 @@ const uint8_t EVENT_SEPARATOR = 255;
 const float FLOW_INT16_TO_FLOAT = 100.0f;
 const float LENS_DISTANCE_TO_CENTER = 0.13f; // approximate distance of lens focal length to OptiTrack center
 const uint32_t EVENT_BYTE_SIZE = sizeof(struct flowEvent) + 1; // +1 for separator
-const float inactivityDecayFactor = 0.9f;
-const float derotationMovingAverageFactor = 0.5f;
+const float inactivityDecayFactor = 0.8f;
 
 // Camera intrinsics definition
 struct cameraIntrinsicParameters dvs128Intrinsics = {
@@ -121,7 +132,7 @@ struct cameraIntrinsicParameters dvs128Intrinsics = {
 // Internal function declarations (definitions below)
 enum updateStatus processUARTInput(struct flowStats* s, double filterTimeConstant);
 static void sendFlowFieldState(struct transport_tx *trans, struct link_device *dev);
-uint16_t checkBufferFreeSpace(void);
+uint16_t bufferGetFreeSpace(void);
 void incrementBufferPos(uint16_t* pos);
 uint8_t ringBufferGetByte(void);
 int16_t ringBufferGetInt16(void);
@@ -131,9 +142,9 @@ void divergenceLandingControllerRun(void);
 
 // ----- Implementations start here -----
 void event_optic_flow_init(void) {
-	struct flowField field = {0., 0., 0., 0., 0., {0.,0.,0.},0.};
-	struct flowStats stats = {0., 0., 0., 0., 0., 0., 0., 0., 0.,
-	    0., 0., 0.,0., 0., 0.,0.};
+  struct flowField field = {0., 0., 0., 0., 0., 0.};
+  struct flowStats stats = {0., 0., 0., 0., 0., 0., 0., 0., 0.,
+        0., 0., 0.};
 	eofState.field = field;
 	eofState.stats = stats;
 
@@ -154,9 +165,9 @@ void event_optic_flow_start(void) {
 	eofState.wyTruth = 0.0f;
 	eofState.DTruth = 0.0f;
 
-	struct flowField field = {0., 0., 0., 0., 0., {0.,0.,0.},0.};
+	struct flowField field = {0., 0., 0., 0., 0., 0.};
 	struct flowStats stats = {0., 0., 0., 0., 0., 0., 0., 0., 0.,
-	    0., 0., 0.,0., 0., 0.,0.};
+      0., 0., 0.};
 	eofState.field = field;
   eofState.stats = stats;
 }
@@ -168,7 +179,7 @@ void event_optic_flow_periodic(void) {
 		// If new events are received, recompute flow field
 		// In case the flow field is ill-posed, do not update
 		status = recomputeFlowField(&eofState.field, &eofState.stats,
-		    minEventRate, minPosVariance, dvs128Intrinsics);
+		    minEventRate, minPosVariance, maxFlowResidual, dvs128Intrinsics);
 	}
 	// Timing bookkeeping, do this after the most uncertain computations,
 	// but before operations where timing info is necessary
@@ -210,6 +221,7 @@ void event_optic_flow_periodic(void) {
 //  struct FloatRMat *rot = stateGetNedToBodyRMat_f();
   struct FloatEulers *ang = stateGetNedToBodyEulers_f();
   eofState.z_NED = pos->z; // for downlink
+
   //TODO implement transformation below for orientation corrected ground truth
   /*struct NedCoor_f velB;
   // Transformation of speeds to body frame
@@ -217,9 +229,10 @@ void event_optic_flow_periodic(void) {
   velB.y = rot->m[1][0] * vel->x + rot->m[1][1] * vel->y + rot->m[1][2] * vel->z;
   velB.z = rot->m[2][0] * vel->x + rot->m[2][1] * vel->y + rot->m[2][2] * vel->z;
   float R = -pos->z/(cosf(ang->theta)*cosf(ang->phi));*/
+
   //TODO verify signs in calculation below
-  eofState.wxTruth = -(vel->y*cosf(-ang->psi) -vel->x*sinf(-ang->psi)) / (pos->z + LENS_DISTANCE_TO_CENTER);
-  eofState.wyTruth = -(vel->x*cosf(-ang->psi) +vel->y*sinf(-ang->psi)) / (pos->z + LENS_DISTANCE_TO_CENTER);
+  eofState.wxTruth = -(vel->y*cosf(ang->psi) -vel->x*sinf(ang->psi)) / (pos->z + LENS_DISTANCE_TO_CENTER);
+  eofState.wyTruth = -(vel->x*cosf(ang->psi) +vel->y*sinf(ang->psi)) / (pos->z + LENS_DISTANCE_TO_CENTER);
   eofState.DTruth = 2*vel->z / (pos->z + LENS_DISTANCE_TO_CENTER);
 
 	// Set control signals
@@ -252,7 +265,7 @@ static uint8_t uartRingBuffer[UART_RX_BUFFER_SIZE]; // local communication buffe
 static uint16_t writePos = 0;
 static uint16_t readPos = 0;
 
-uint16_t checkBufferFreeSpace(void) {
+uint16_t bufferGetFreeSpace(void) {
   return (readPos + UART_RX_BUFFER_SIZE - writePos - 1) % UART_RX_BUFFER_SIZE;
 }
 
@@ -285,17 +298,17 @@ int32_t ringBufferGetInt32(void) {
 enum updateStatus processUARTInput(struct flowStats* s, double filterTimeConstant) {
   enum updateStatus returnStatus = UPDATE_NONE;
 	// Copy UART data to buffer if not full
-	while( checkBufferFreeSpace() > 0 && uart_char_available(&DVS_PORT)) {
-		uartRingBuffer[writePos] = uart_getch(&DVS_PORT);          // copy over incoming data
+	while( bufferGetFreeSpace() > 0 && uart_char_available(&DVS_PORT)) {
+		uartRingBuffer[writePos] = uart_getch(&DVS_PORT);          // copy incoming data
 		incrementBufferPos(&writePos);
 	}
 
 	// Now scan across received data and extract events
 	// Scan until read pointer is one byte behind ith the write pointer
-	static bool synchronized;
+	static bool synchronized = false;
 	while((writePos + UART_RX_BUFFER_SIZE - readPos) % UART_RX_BUFFER_SIZE > (int32_t) EVENT_BYTE_SIZE) {
 	  if (synchronized) {
-	    // Next data contains a new event
+	    // Next set of bytes contains a new event
 	    struct flowEvent e;
 	    uint8_t separator;
 	    int16_t u,v;
@@ -308,8 +321,9 @@ enum updateStatus processUARTInput(struct flowStats* s, double filterTimeConstan
 	    e.v = (float) v / FLOW_INT16_TO_FLOAT;
 	    separator = ringBufferGetByte();
 	    if (separator == EVENT_SEPARATOR) {
-	      // Full event received - this can be processed further
-	      updateFlowStats(s, e, eofState.field, filterTimeConstant, MOVING_AVERAGE_MIN_WINDOW, flowMaxSpeedDiff);
+	      // Full event received - we can process this further
+	      updateFlowStats(s, e, eofState.field, filterTimeConstant, MOVING_AVERAGE_MIN_WINDOW,
+	          flowMaxSpeedDiff, dvs128Intrinsics);
 	      returnStatus = UPDATE_STATS;
 	    }
 	    else {
