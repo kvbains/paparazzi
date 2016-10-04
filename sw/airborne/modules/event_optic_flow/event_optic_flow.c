@@ -24,6 +24,7 @@
  */
 
 #include "event_optic_flow.h"
+//#include "divergence_landing_control.h"
 
 #include "mcu_periph/uart.h"
 #include "mcu_periph/sys_time.h"
@@ -44,17 +45,17 @@
 PRINT_CONFIG_VAR(EOF_ENABLE_DEROTATION)
 
 #ifndef EOF_FILTER_TIME_CONSTANT
-#define EOF_FILTER_TIME_CONSTANT 0.05f
+#define EOF_FILTER_TIME_CONSTANT 0.01f
 #endif
 PRINT_CONFIG_VAR(EOF_FILTER_TIME_CONSTANT)
 
 #ifndef EOF_FLOW_MAX_SPEED_DIFF
-#define EOF_FLOW_MAX_SPEED_DIFF 100.0f
+#define EOF_FLOW_MAX_SPEED_DIFF 50.0f
 #endif
 PRINT_CONFIG_VAR(EOF_FLOW_MAX_SPEED_DIFF)
 
 #ifndef EOF_DEROTATION_MOVING_AVERAGE_FACTOR
-#define EOF_DEROTATION_MOVING_AVERAGE_FACTOR 0.02f
+#define EOF_DEROTATION_MOVING_AVERAGE_FACTOR 0.5f
 #endif
 PRINT_CONFIG_VAR(EOF_DEROTATION_MOVING_AVERAGE_FACTOR)
 
@@ -69,7 +70,7 @@ PRINT_CONFIG_VAR(EOF_MIN_EVENT_RATE)
 PRINT_CONFIG_VAR(EOF_MIN_POSITION_VARIANCE)
 
 #ifndef EOF_MAX_FLOW_RESIDUAL
-#define EOF_MAX_FLOW_RESIDUAL 0.6f
+#define EOF_MAX_FLOW_RESIDUAL 0.7f
 #endif
 PRINT_CONFIG_VAR(EOF_MAX_FLOW_RESIDUAL)
 
@@ -130,15 +131,13 @@ struct cameraIntrinsicParameters dvs128Intrinsics = {
 };
 
 // Internal function declarations (definitions below)
-enum updateStatus processUARTInput(struct flowStats* s, double filterTimeConstant);
+enum updateStatus processUARTInput(struct flowStats* s, double filterTimeConstant, int32_t* N);
 static void sendFlowFieldState(struct transport_tx *trans, struct link_device *dev);
 uint16_t bufferGetFreeSpace(void);
 void incrementBufferPos(uint16_t* pos);
 uint8_t ringBufferGetByte(void);
 int16_t ringBufferGetInt16(void);
 int32_t ringBufferGetInt32(void);
-void divergenceLandingControllerInit(void);
-void divergenceLandingControllerRun(void);
 
 // ----- Implementations start here -----
 void event_optic_flow_init(void) {
@@ -170,11 +169,18 @@ void event_optic_flow_start(void) {
       0., 0., 0.};
 	eofState.field = field;
   eofState.stats = stats;
+  eofState.caerInputReceived = false;
 }
 
 void event_optic_flow_periodic(void) {
+  struct FloatRates *rates = stateGetBodyRates_f();
+    // Moving average filtering of body rates
+    eofState.ratesMA.p += (rates->p - eofState.ratesMA.p) * derotationMovingAverageFactor;
+    eofState.ratesMA.q += (rates->q - eofState.ratesMA.q) * derotationMovingAverageFactor;
+
 	// Obtain UART data if available
-	enum updateStatus status = processUARTInput(&eofState.stats, statsFilterTimeConstant);
+  int32_t NNew;
+	enum updateStatus status = processUARTInput(&eofState.stats, statsFilterTimeConstant, &NNew);
 	if (status == UPDATE_STATS) {
 		// If new events are received, recompute flow field
 		// In case the flow field is ill-posed, do not update
@@ -203,17 +209,18 @@ void event_optic_flow_periodic(void) {
 
 	// Derotate flow field if enabled
 	if (enableDerotation) {
-		struct FloatRates *rates = stateGetBodyRates_f();
-		// Moving average filtering of body rates
-		eofState.ratesMA.p += (rates->p - eofState.ratesMA.p) * derotationMovingAverageFactor;
-		eofState.ratesMA.q += (rates->q - eofState.ratesMA.q) * derotationMovingAverageFactor;
-		derotateFlowField(&eofState.field, &eofState.ratesMA);
+//		struct FloatRates *rates = stateGetBodyRates_f();
+//		 Moving average filtering of body rates
+//		eofState.ratesMA.p += (rates->p - eofState.ratesMA.p) * derotationMovingAverageFactor;
+//		eofState.ratesMA.q += (rates->q - eofState.ratesMA.q) * derotationMovingAverageFactor;
+		//derotateFlowField(&eofState.field, &eofState.ratesMA);
 	}
 	else {
 	  // Default: simply copy result
 	  eofState.field.wxDerotated = eofState.field.wx;
 	  eofState.field.wyDerotated = eofState.field.wy;
 	}
+	//eofState.field.wxDerotated = NNew;
 
 	// Update height/ground truth speeds from Optitrack
   struct NedCoor_f *pos = stateGetPositionNed_f();
@@ -249,9 +256,6 @@ void event_optic_flow_periodic(void) {
 
 	  // Update control state
 	  AbiSendMsgVELOCITY_ESTIMATE(1, timestamp, vxB, vyB, vzB, 0);
-	}
-	if (EOF_CONTROL_LANDING) {
-	  divergenceLandingControllerRun();
 	}
 	//TODO implement SD logging (use modules/loggers/sdlog_chibios/sdLog.h?)
 }
@@ -295,7 +299,7 @@ int32_t ringBufferGetInt32(void) {
   return out;
 }
 
-enum updateStatus processUARTInput(struct flowStats* s, double filterTimeConstant) {
+enum updateStatus processUARTInput(struct flowStats* s, double filterTimeConstant, int32_t *N) {
   enum updateStatus returnStatus = UPDATE_NONE;
 	// Copy UART data to buffer if not full
 	while( bufferGetFreeSpace() > 0 && uart_char_available(&DVS_PORT)) {
@@ -303,6 +307,7 @@ enum updateStatus processUARTInput(struct flowStats* s, double filterTimeConstan
 		incrementBufferPos(&writePos);
 	}
 
+	*N = 0;
 	// Now scan across received data and extract events
 	// Scan until read pointer is one byte behind ith the write pointer
 	static bool synchronized = false;
@@ -319,12 +324,22 @@ enum updateStatus processUARTInput(struct flowStats* s, double filterTimeConstan
 	    v = ringBufferGetInt16();
 	    e.u = (float) u / FLOW_INT16_TO_FLOAT;
 	    e.v = (float) v / FLOW_INT16_TO_FLOAT;
+
+	    if (enableDerotation) {
+	        e.u -= eofState.ratesMA.p*dvs128Intrinsics.focalLengthX;
+	        e.v += eofState.ratesMA.q*dvs128Intrinsics.focalLengthY;
+	    }
+
 	    separator = ringBufferGetByte();
 	    if (separator == EVENT_SEPARATOR) {
 	      // Full event received - we can process this further
 	      updateFlowStats(s, e, eofState.field, filterTimeConstant, MOVING_AVERAGE_MIN_WINDOW,
 	          flowMaxSpeedDiff, dvs128Intrinsics);
 	      returnStatus = UPDATE_STATS;
+	      if (!eofState.caerInputReceived) {
+	        eofState.caerInputReceived = TRUE;
+	      }
+	      (*N)++;
 	    }
 	    else {
 	      // we are apparently out of sync - do not process event
@@ -348,8 +363,8 @@ static void sendFlowFieldState(struct transport_tx *trans, struct link_device *d
   float wx = eofState.field.wx;
   float wy = eofState.field.wy;
   float D  = eofState.field.D;
-  float wxDerotated = eofState.field.wxDerotated;
-  float wyDerotated = eofState.field.wyDerotated;
+  float wxDerotated = eofState.ratesMA.p;
+  float wyDerotated = eofState.ratesMA.q;
   float wxTruth = eofState.wxTruth;
   float wyTruth = eofState.wyTruth;
   float DTruth = eofState.DTruth;
@@ -357,13 +372,5 @@ static void sendFlowFieldState(struct transport_tx *trans, struct link_device *d
   pprz_msg_send_EVENT_OPTIC_FLOW_EST(trans, dev, AC_ID,
       &fps, &confidence, &eventRate, &wx, &wy, &D, &wxDerotated, &wyDerotated,
       &wxTruth,&wyTruth,&DTruth);
-}
-
-void divergenceLandingControllerInit(void) {
-  //TODO implement
-}
-
-void divergenceLandingControllerRun(void) {
-  //TODO implement
 }
 
