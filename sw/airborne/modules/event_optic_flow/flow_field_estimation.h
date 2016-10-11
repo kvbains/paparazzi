@@ -12,6 +12,8 @@
 #include <inttypes.h>
 #include "math/pprz_algebra_float.h"
 
+#define N_FIELD_DIRECTIONS 4
+
 /**
  * Flow event struct, simplified version of the cAER implementation.
  * It contains all fields passed from the DVS through UART.
@@ -19,7 +21,7 @@
  * all received events are assumed to be valid.
  */
 struct flowEvent {
-  uint8_t x,y;
+  float x,y;
   int32_t t;
   float u,v;
 };
@@ -34,6 +36,7 @@ struct flowField {
   float wxDerotated;
   float wyDerotated;
   float D;
+  float confidence;
   int32_t t;
 };
 
@@ -60,23 +63,17 @@ struct flowField {
  * least-squares solution.
  */
 struct flowStats {
-  float mx, mu, mxx, mxu, muu;
-  float my, mv, myy, myv, mvv;
-  float mxy;
+  float N[N_FIELD_DIRECTIONS];
+  float ms[N_FIELD_DIRECTIONS];
+  float mss[N_FIELD_DIRECTIONS];
+  float mV[N_FIELD_DIRECTIONS];
+  float mVV[N_FIELD_DIRECTIONS];
+  float msV[N_FIELD_DIRECTIONS];
+  int32_t tLast[N_FIELD_DIRECTIONS];
+  float angles[N_FIELD_DIRECTIONS];
+  float cos_angles[N_FIELD_DIRECTIONS];
+  float sin_angles[N_FIELD_DIRECTIONS];
   float eventRate;
-};
-
-/**
- * Camera intrinsic parameters struct.
- *
- * Contains the principal point coordinates (x,y) and the focal lengths for x and y.
- * Note that these are scaled by
- */
-struct cameraIntrinsicParameters {
-  float principalPointX;
-  float principalPointY;
-  float focalLengthX;
-  float focalLengthY;
 };
 
 /**
@@ -93,17 +90,33 @@ enum updateStatus {
 };
 
 /**
+ * Camera intrinsic parameters.
+ */
+struct cameraIntrinsicParameters {
+  float principalPointX;
+  float principalPointY;
+  float focalLengthX;
+  float focalLengthY;
+};
+
+/**
+ * Initializes/resets flow stats values to zero.
+ * @param s The flow stats container
+ */
+void flowStatsInit(struct flowStats *s);
+
+/**
  * Performs an update of all flow field statistics with a new event.
  */
-void updateFlowStats(struct flowStats* s, struct flowEvent e, struct flowField lastField,
+void flowStatsUpdate(struct flowStats* s, struct flowEvent e, struct flowField lastField,
     float filterTimeConstant, float movingAverageWindow, float maxSpeedDifference,
-  struct cameraIntrinsicParameters intrinsics);
+    struct cameraIntrinsicParameters intrinsics);
 
 /**
  * Recomputation of the flow field using the latest statistics.
  */
 enum updateStatus recomputeFlowField(struct flowField* field, struct flowStats* s,
-    float minEventRate, float minPosVariance, float maxFlowResidual,
+    float minEventRate, float minPosVariance, float minR2, float power,
     struct cameraIntrinsicParameters intrinsics);
 
 /**
