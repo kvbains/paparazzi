@@ -236,7 +236,7 @@ void guidance_v_mode_changed(uint8_t new_mode)
       guidance_v_guided_vel_enabled = false;
 
       /* set current altitude as setpoint */
-      guidance_v_z_sp = stateGetPositionNed_i()->z;
+      guidance_v_z_sp = POS_BFP_OF_REAL(-3);//stateGetPositionNed_i()->z;
       guidance_v_zd_sp = 0;
 
       /* reset guidance reference */
