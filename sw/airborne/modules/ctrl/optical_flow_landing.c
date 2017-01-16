@@ -405,11 +405,11 @@ void vertical_ctrl_module_run(bool in_flight)
           cov_div = get_cov(past_divergence_history, divergence_history, COV_WINDOW_SIZE);
         }
 
-        if (ind_hist >= COV_WINDOW_SIZE && fabs(cov_div) > of_landing_ctrl.cov_limit) {
-          // land by setting 90% nominal thrust:
-          landing = 1;
-          thrust = 0.90 * nominal_throttle;
-        }
+//        if (ind_hist >= COV_WINDOW_SIZE && fabs(cov_div) > of_landing_ctrl.cov_limit) {
+//          // land by setting 90% nominal thrust:
+//          landing = 1;
+//          thrust = 0.90 * nominal_throttle;
+//        }
         if (ASSIGN_CONTROL) {
           stabilization_cmd[COMMAND_THRUST] = thrust;
         }
