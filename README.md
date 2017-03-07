@@ -18,7 +18,7 @@ and from the mailing list [paparazzi-devel@nongnu.org] (http://savannah.nongnu.o
 and the IRC channel (freenode, #paparazzi).
 
 
-Required Software
+Not Required Software
 -----------------
 
 Installation is described in the wiki (http://wiki.paparazziuav.org/wiki/Installation).
