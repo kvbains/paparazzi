@@ -1,6 +1,11 @@
 # MAIN README
+<<<<<<< HEAD
 
-Maparazzi UAS
+Paparazzi UAS
+=======
+Eerste 
+Kaparazzi UAS
+>>>>>>> 43903ccd9c9f4f27726e12f20d53cdd33c8f1af7
 =============
 
 [![Build Status](https://travis-ci.org/paparazzi/paparazzi.png?branch=master)](https://travis-ci.org/paparazzi/paparazzi) [![Gitter chat](https://badges.gitter.im/paparazzi/discuss.svg)](https://gitter.im/paparazzi/discuss)
