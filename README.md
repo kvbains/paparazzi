@@ -1,6 +1,6 @@
 # MAIN README
 
-Paparazzi UAS
+Maparazzi UAS
 =============
 
 [![Build Status](https://travis-ci.org/paparazzi/paparazzi.png?branch=master)](https://travis-ci.org/paparazzi/paparazzi) [![Gitter chat](https://badges.gitter.im/paparazzi/discuss.svg)](https://gitter.im/paparazzi/discuss)
