@@ -1,0 +1,21 @@
+<!DOCTYPE module SYSTEM "module.dtd">
+
+<module name="master_corner_avoider">
+  <doc>
+    <description>Links the corner detector software to the camera and makes it see the corners</description>
+    <define name="CORNERDETECTOR_CAMERA" value="front_camera|bottom_camera" description="Video device to use"/>
+  </doc>
+  
+  <depends>video_thread</depends>
+
+  <header>
+    <file name="master_corner_avoider.h"/>
+  </header>
+
+  <init fun="mca_init()"/>
+  <makefile target="ap">
+    <file name="master_corner_avoider.c"/>
+    <file name="../computer_vision/lib/vision/fast_rosten.c"/>
+  </makefile>
+</module>
+

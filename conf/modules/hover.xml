@@ -1,0 +1,16 @@
+<!DOCTYPE module SYSTEM "module.dtd">
+
+<module name="hover">
+  <doc>
+    <description>makes drone hover at fixed height</description>
+  </doc>
+  <header>
+    <file name="hover.h"/>
+  </header>
+  <init fun="hover_init()"/>
+  <periodic fun="hover_periodic" freq="1" autorun="TRUE"/>
+  <makefile>
+    <file name="hover.c"/>
+  </makefile>
+</module>
+

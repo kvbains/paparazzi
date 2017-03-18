@@ -51,18 +51,18 @@
 			<define name="CV_AE_AWB_AV" value="1"/>
 			<define name="CV_AE_AWB_VERBOSE" value="0"/>
 		</module>
-		<module name="cv_colorfilter">
-			<define name="COLORFILTER_CAMERA" value="front_camera"/>
+		<module name="master_corner_avoider"> 
+			<define name="CORNERDETECTOR_CAMERA" value="front_camera"/>
 		</module>
-		<module name="orange_avoider"/>
+		<module name="corner_avoider"/>
 		<module name="video_rtp_stream">
-			<configure name="VIEWVIDEO_HOST" value="192.168.42.17"/>
+			<configure name="VIEWVIDEO_HOST" value="192.168.42.6"/>
 			<configure name="VIEWVIDEO_BROADCAST" value="FALSE"/>
 			<define name="VIEWVIDEO_CAMERA" value="front_camera"/>
 			<define name="VIEWVIDEO_SHOT_PATH" value="/data/ftp/internal_000"/>
 			<define name="VIEWVIDEO_FPS" value="18"/>
 			<define name="VIEWVIDEO_WRITE_VIDEO" value="FALSE"/>
-			<define name="VIEWVIDEO_VIDEO_FILE" value="orangeAvoider"/>
+			<define name="VIEWVIDEO_VIDEO_FILE" value="orangeAvoider"/> <!-- whats happening here -->
 			<define name="VIEWVIDEO_STREAM_VIDEO" value="TRUE"/>
 		</module>
 	</modules>
@@ -172,7 +172,7 @@
 		<!-- first order actuator dynamics -->
 		<define name="ACT_DYN" value="0.1"/>
 		<!-- Adaptive Learning Rate -->
-		<define name="USE_ADAPTIVE" value="TRUE"/>
+		<define name="USE_ADAPTIVE" value="FALSE"/>
 		<define name="ADAPTIVE_MU" value="0.0001"/>
 	</section>
 

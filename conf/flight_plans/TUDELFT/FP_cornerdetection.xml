@@ -1,6 +1,6 @@
 <!DOCTYPE flight_plan SYSTEM "../flight_plan.dtd">
 
-<flight_plan alt="4.0" ground_alt="3.0" lat0="51.9906224" lon0="4.3767678" max_dist_from_home="8" name="Bebop avoid orange TU Delft Cyberzoo" security_height="0.4">
+<flight_plan alt="4.0" ground_alt="3.0" lat0="51.9906224" lon0="4.3767678" max_dist_from_home="8" name="Bebop corner detect TU Delft Cyberzoo" security_height="0.4">
   <header>
     #include "subsystems/datalink/datalink.h"
     #include "subsystems/electrical.h"
@@ -85,7 +85,7 @@
     <block name="Holding point">
       <call_once fun="NavKillThrottle()"/>
       <attitude pitch="0" roll="0" throttle="0" until="FALSE" vmode="throttle"/>
-    </block>
+    </block> 
     <block key="r" name="Start Engine">
       <call_once fun="NavResurrect()"/>
       <attitude pitch="0" roll="0" throttle="0" until="FALSE" vmode="throttle"/>
@@ -102,7 +102,7 @@
     </block>
     <block key="g" name="START" strip_button="Go" strip_icon="lookfore.png">
       <call_once fun="NavSetWaypointHere(WP_GOAL)"/>
-      <set var="trajectoryConfidence" value="1"/> <!-- trajectory confidence is speed van de drone -->
+      <set var="trajectoryConfidence" value="1"/>
     </block>
     <block name="StayGoal">
       <stay wp="GOAL"/>
@@ -110,7 +110,7 @@
     </block>
     <block name="PrepareObstacleRun">
       <while cond="!InsideObstacleZone(WaypointX(WP_TRAJECTORY),WaypointY(WP_TRAJECTORY))">
-        <call_once fun="increase_nav_heading(&nav_heading, 5)"/> <!-- nav heading is rechts om draaien -->
+        <call_once fun="increase_nav_heading(&nav_heading, 12)"/>
       </while>
     </block>
     <block name="GetIntoObstacleZone">

@@ -7,13 +7,13 @@
     #include "subsystems/radio_control.h"
     #include "subsystems/ahrs.h"
 </header>
-  <waypoints>
+  <waypoints> 
     <waypoint lat="51.990631" lon="4.376796" name="HOME"/>
     <waypoint name="CLIMB" x="1.9" y="1.0"/>
     <waypoint name="STDBY" x="1.9" y="1.0"/>
     <waypoint name="TD" x="0.8" y="-1.7"/>
     <waypoint name="GOAL" x="1.9" y="1.0"/>
-    <waypoint name="TRAJECTORY" x="1.9" y="1.0"/>
+    <waypoint name="TRAJECTORY" x="1.9" y="1.0"/> 
     <waypoint lat="51.9905836" lon="4.3767729" name="_CZ1"/>
     <waypoint lat="51.9906365" lon="4.3767138" name="_CZ2"/>
     <waypoint lat="51.990680" lon="4.376805" name="_CZ3"/>
@@ -22,7 +22,7 @@
     <waypoint lat="51.990636" lon="4.376733" name="_OZ2"/>
     <waypoint lat="51.990671" lon="4.376806" name="_OZ3"/>
     <waypoint lat="51.990624" lon="4.376852" name="_OZ4"/>
-  </waypoints>
+  </waypoints> 
   <sectors>
     <sector color="red" name="CyberZoo">
       <corner name="_CZ1"/>
@@ -37,7 +37,7 @@
       <corner name="_OZ4"/>
     </sector>
   </sectors>
-  <exceptions>
+  <exceptions> 
     <!-- RC lost -->
     <exception cond="((radio_control.status == RC_REALLY_LOST) &&
       !(IndexOfBlock('Holding point') > nav_block) &&
@@ -102,7 +102,7 @@
     </block>
     <block key="g" name="START" strip_button="Go" strip_icon="lookfore.png">
       <call_once fun="NavSetWaypointHere(WP_GOAL)"/>
-      <set var="trajectoryConfidence" value="1"/> <!-- trajectory confidence is speed van de drone -->
+      <set var="trajectoryConfidence" value="1"/>
     </block>
     <block name="StayGoal">
       <stay wp="GOAL"/>
@@ -110,7 +110,7 @@
     </block>
     <block name="PrepareObstacleRun">
       <while cond="!InsideObstacleZone(WaypointX(WP_TRAJECTORY),WaypointY(WP_TRAJECTORY))">
-        <call_once fun="increase_nav_heading(&nav_heading, 5)"/> <!-- nav heading is rechts om draaien -->
+        <call_once fun="increase_nav_heading(&nav_heading, 5)"/>
       </while>
     </block>
     <block name="GetIntoObstacleZone">

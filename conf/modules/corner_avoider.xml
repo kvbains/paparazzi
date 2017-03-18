@@ -1,0 +1,18 @@
+<!DOCTYPE module SYSTEM "module.dtd">
+
+<module name="corner_avoider">
+  <doc>
+    <description>
+	Detect corners
+    </description>
+  </doc>
+  <header>
+    <file name="corner_avoider.h"/>
+  </header>
+  <init fun="corner_avoider_init()"/>
+  <periodic fun="corner_avoider_periodic()" freq="15"/>
+  <makefile target="ap">
+    <file name="corner_avoider.c"/>
+  </makefile>
+</module>
+

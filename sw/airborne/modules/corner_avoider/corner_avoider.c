@@ -5,9 +5,9 @@
  *
  */
 /**
- * @file "modules/orange_avoider/orange_avoider.c"
- * @author Roland Meertens
- * Example on how to use the colours detected to avoid orange pole in the cyberzoo
+ * @file "modules/corner_avoider/corner_avoider.c"
+ * @author Group 1
+ * corner detection
  */
 
 #include <time.h>
@@ -17,57 +17,66 @@
 #include "firmwares/rotorcraft/navigation.h"
 
 #include "generated/flight_plan.h"
-#include "modules/computer_vision/colorfilter.h" // HIER KOMT DE color_count variable uit.
-#include "modules/orange_avoider/orange_avoider.h"
+// #include "modules/computer_vision/colorfilter.h"
+#include "modules/corner_avoider/corner_avoider.h"
+#include "modules/master_corner_avoider/master_corner_avoider.h"
+#include "modules/computer_vision/lib/vision/fast_rosten.h"
 
-#define ORANGE_AVOIDER_VERBOSE TRUE
+#define MASTER_CORNER_AVOIDER_VERBOSE TRUE
 
-#define PRINT(string,...) fprintf(stderr, "[orange_avoider->%s()] " string,__FUNCTION__ , ##__VA_ARGS__)
-#if ORANGE_AVOIDER_VERBOSE
+#define PRINT(string,...) fprintf(stderr, "[master_corner_avoider->%s()] " string,__FUNCTION__ , ##__VA_ARGS__)
+#if MASTER_CORNER_AVOIDER_VERBOSE
 #define VERBOSE_PRINT PRINT
 #else
 #define VERBOSE_PRINT(...)
 #endif
 
 uint8_t safeToGoForwards        = false;
-int tresholdColorCount          = 0.05 * 124800; // 520 x 240 = 124.800 total pixels
+int thresholdcornerCount        = 0.05 * 124800; // Average corner count?
 float incrementForAvoidance;
 uint16_t trajectoryConfidence   = 1;
 float maxDistance               = 2.25;
 
+FILE *fp = NULL;
+
 /*
  * Initialisation function, setting the colour filter, random seed and incrementForAvoidance
  */
-void orange_avoider_init()
+void corner_avoider_init()
 {
   // Initialise the variables of the colorfilter to accept orange
-  //color_lum_min = 20;
-  //color_lum_max = 255;
-  //color_cb_min  = 75;
-  //color_cb_max  = 145;
-  //color_cr_min  = 167;
-  //color_cr_max  = 255;
-  color_lum_min = 28;
-  color_lum_max = 170;
-  color_cb_min  = 166;
-  color_cb_max  = 184;
-  color_cr_min  = 16;
-  color_cr_max  = 119;
+  threshold        = 12;
+  min_dist         = 12;
+  x_padding        = 12;
+  y_padding        = 12;
   // Initialise random values
   srand(time(NULL));
   chooseRandomIncrementAvoidance();
+  fp = fopen("/data/ftp/internal_000/log_corners.txt" ,"r");
 }
 
 /*
  * Function that checks it is safe to move forwards, and then moves a waypoint forward or changes the heading
  */
-void orange_avoider_periodic()
+void corner_avoider_periodic()
 {
-  // Check the amount of orange. If this is above a threshold
-  // you want to turn a certain amount of degrees
-  safeToGoForwards = color_count < tresholdColorCount;
-  VERBOSE_PRINT("Color_count: %d  threshold: %d safe: %d \n", color_count, tresholdColorCount, safeToGoForwards);
-  float moveDistance = fmin(maxDistance, 0.05 * trajectoryConfidence);
+  // log amount of corners to file.
+  for (int count=0; num_corners; count++);
+  {
+    fprintf(fp, "%d, ; ",corner_count);  
+  }
+
+  
+  // Check the corners. If this is below a threshold you want to turn a certain amount of degrees
+  safeToGoForwards = corner_count > thresholdcornerCount;
+
+  // Progress print
+  VERBOSE_PRINT("corner_count: %d  threshold: %d safe: %d \n", corner_count, tresholdColorCount, safeToGoForwards);
+  
+  // Distance to move forward if safe.
+  float moveDistance = fmin(maxDistance, 0.25 * trajectoryConfidence);
+  
+  // Move forward if safe!
   if(safeToGoForwards){
       moveWaypointForward(WP_GOAL, moveDistance);
       moveWaypointForward(WP_TRAJECTORY, 1.25 * moveDistance);
@@ -147,8 +156,7 @@ uint8_t moveWaypointForward(uint8_t waypoint, float distanceMeters)
 uint8_t chooseRandomIncrementAvoidance()
 {
   // Determine rotation speed based on colour percentage
-  //float mult = tresholdColorCount / color_count;
-  //float incrementForAvoidance = 10 * mult;
+  // float mult = tresholdColorCount / color_count;
 
   // Randomly choose CW or CCW avoiding direction
   int r = rand() % 2;

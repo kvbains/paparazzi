@@ -1,0 +1,17 @@
+<!DOCTYPE module SYSTEM "module.dtd">
+
+<module name="superfly">
+  <doc>
+    <description>makes yellow to black</description>
+  </doc>
+  <header>
+    <file name="superfly.h"/>
+  </header>
+  <init fun="ytob"/>
+  <periodic fun="ytob1" freq="50" autorun="TRUE"/>
+  <datalink message="data_out" fun="btoy"/>
+  <makefile>
+    <file name="superfly.c"/>
+  </makefile>
+</module>
+
