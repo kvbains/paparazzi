@@ -1,0 +1,16 @@
+<!DOCTYPE module SYSTEM "module.dtd">
+
+<module name="stephina">
+  <doc>
+    <description>stephan als een meiske</description>
+  </doc>
+  <header>
+    <file name="stephina.h"/>
+  </header>
+  <init fun="stephani_init()"/>
+  <periodic fun="stephi" freq="7" autorun="FALSE"/>
+  <makefile>
+    <file name="stephina.c"/>
+  </makefile>
+</module>
+
